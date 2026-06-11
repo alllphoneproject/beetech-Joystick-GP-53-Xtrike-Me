@@ -8,7 +8,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { AppProvider, useAppContext } from './context/AppContext';
-import { JoystickModel } from './components/JoystickModel';
+import { HybridPhotoController } from './components/HybridPhotoController';
 import { Hotspot } from './components/Hotspot';
 import { UIOverlay } from './components/UIOverlay';
 import { TutorialModal } from './components/TutorialModal';
@@ -26,7 +26,7 @@ const CameraDirector: React.FC = () => {
       }
     }
     // Default cinematic inspection angle
-    return new THREE.Vector3(0, 0.8, 2.8);
+    return new THREE.Vector3(0.45, 0.72, 2.65);
   }, [tutorialStep, tutorialMode, tutorialSteps]);
 
   // Track the current active lerping targets
@@ -120,7 +120,7 @@ const SceneContents: React.FC = () => {
 
       {/* The detailed GP-53 hardware model assembly */}
       <group position={[0, -0.1, 0]}>
-        <JoystickModel />
+        <HybridPhotoController />
 
         {/* Dynamic visual annotations floating in 3D coordinate space */}
         {hotspots.map((hs) => (
@@ -134,6 +134,47 @@ const SceneContents: React.FC = () => {
   );
 };
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          padding: '24px',
+          color: '#ef4444',
+          background: '#111317',
+          border: '1px solid #ef4444',
+          borderRadius: '12px',
+          zIndex: 9999,
+          position: 'absolute',
+          top: '20px',
+          left: '20px',
+          right: '20px',
+          direction: 'ltr',
+          textAlign: 'left',
+          fontFamily: 'monospace'
+        }}>
+          <h2 style={{ marginBottom: '12px', fontSize: '18px', fontWeight: 'bold' }}>3D Model Loading Error:</h2>
+          <pre style={{ whiteSpace: 'pre-wrap', background: '#000', padding: '12px', borderRadius: '6px', overflow: 'auto' }}>
+            {this.state.error?.toString()}<br/>
+            {this.state.error?.stack}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
     <AppProvider>
@@ -143,23 +184,25 @@ export default function App() {
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_center,rgba(74,222,128,0.06)_0%,transparent_75%)] pointer-events-none" />
 
         {/* 1. Full Screen WebGL Canvas */}
-        <Canvas
-          shadows
-          gl={{ localClippingEnabled: true }}
-          camera={{ position: [0, 0.8, 2.8], fov: 45 }}
-          className="absolute inset-0 z-10 w-full h-full"
-        >
-          <SceneContents />
+        <ErrorBoundary>
+          <Canvas
+            shadows
+            gl={{ localClippingEnabled: true }}
+            camera={{ position: [0.45, 0.72, 2.65], fov: 43 }}
+            className="absolute inset-0 z-10 w-full h-full"
+          >
+            <SceneContents />
 
-          <OrbitControls
-            enableDamping
-            dampingFactor={0.05}
-            enablePan={false}
-            minDistance={1.6}
-            maxDistance={4.2}
-            makeDefault
-          />
-        </Canvas>
+            <OrbitControls
+              enableDamping
+              dampingFactor={0.05}
+              enablePan={false}
+              minDistance={1.6}
+              maxDistance={4.2}
+              makeDefault
+            />
+          </Canvas>
+        </ErrorBoundary>
 
         {/* 2. Glassmorphic 3D walkthrough modals */}
         <TutorialModal />

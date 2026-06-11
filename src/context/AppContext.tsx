@@ -170,7 +170,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [deviceState, setDeviceState] = useState<DeviceState>('idle');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('interactive');
   const [activeHotspot, setActiveHotspot] = useState<string | null>(null);
-  const [tutorialMode, setTutorialMode] = useState<boolean>(true);
+  const [tutorialMode, setTutorialMode] = useState<boolean>(false);
   const [tutorialStep, setTutorialStep] = useState<number>(0);
   const [lightOn, setLightOn] = useState<boolean>(true);
   const [soundOn, setSoundOn] = useState<boolean>(true);

@@ -43,10 +43,10 @@ export const Hotspot: React.FC<HotspotProps> = ({ hotspot }) => {
             setActiveHotspot(null);
             document.body.style.cursor = 'auto';
           }}
-          className={`w-[14px] h-[14px] rounded-full relative flex items-center justify-center transition-all duration-300 cursor-pointer pointer-events-auto border 
+          className={`w-[10px] h-[10px] rounded-full relative flex items-center justify-center transition-all duration-300 cursor-pointer pointer-events-auto border 
             ${isActive 
-              ? 'bg-[#4ade80] border-[#4ade80] scale-125' 
-              : 'bg-[#111315]/80 border-white/40 hover:border-[#4ade80]'
+              ? 'bg-[#4ade80] border-[#4ade80] scale-125 shadow-[0_0_14px_rgba(74,222,128,0.65)]' 
+              : 'bg-[#0a0d0c]/45 border-white/12 opacity-35 hover:opacity-100 hover:border-[#4ade80]'
             }`}
         >
           {/* Subtle Outer Pulse Ring */}
@@ -54,7 +54,7 @@ export const Hotspot: React.FC<HotspotProps> = ({ hotspot }) => {
             ${isActive ? 'animate-ping scale-200' : 'scale-100 opacity-0'}`} />
           
           {/* Central Core */}
-          <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-black' : 'bg-white'} transition-colors`} />
+          <span className={`w-1 h-1 rounded-full ${isActive ? 'bg-black' : 'bg-white/55'} transition-colors`} />
         </button>
 
         {/* 2. GLOWING CONNECTOR LINE */}

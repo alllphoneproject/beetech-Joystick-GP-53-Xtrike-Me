@@ -1,20 +1,23 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# GP-53 Xtrike Me Interactive 3D Product Demo
 
-# Run and deploy your AI Studio app
+Interactive web demo for the BeeTech / Xtrike Me GP-53 controller.
 
-This contains everything you need to run your app locally.
+Live site:
+https://alllphoneproject.github.io/beetech-Joystick-GP-53-Xtrike-Me/
 
-View your app in AI Studio: https://ai.studio/apps/b7a7e466-f0f4-4976-a40e-42142dac2f00
+## Local Development
 
-## Run Locally
+```bash
+npm install
+npm run dev
+```
 
-**Prerequisites:**  Node.js
+Open `http://localhost:3000/`.
 
+## Build
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+npm run build
+```
+
+The app is deployed to GitHub Pages automatically from the `main` branch.
