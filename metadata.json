@@ -1,0 +1,6 @@
+{
+  "name": "Joystick GP-53 Xtrike Me 3D",
+  "description": "An interactive, cinematic 3D product simulation of the GP-53 Xtrike Me gamepad with interactive 3D buttons, physical switches, embedded LCD screens, and language-responsive visual hotspots.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
