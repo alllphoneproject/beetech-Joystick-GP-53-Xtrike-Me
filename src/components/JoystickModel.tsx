@@ -1,199 +1,9 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { RoundedBox, Html } from '@react-three/drei';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAppContext } from '../context/AppContext';
 import { playClickSound, playSlideSound, playPowerBeep } from '../utils/audio';
-
-// Button depression component mimicking precise physical mechanical travel
-interface PressableButtonProps {
-  position: [number, number, number];
-  rotation?: [number, number, number];
-  args?: [number, number, number]; // size
-  radius?: number; // for rounded box
-  color?: string;
-  hoverColor?: string;
-  onClick?: () => void;
-  id?: string;
-  name?: string;
-  children?: React.ReactNode;
-}
-
-export const PressableDeviceButton: React.FC<PressableButtonProps> = ({
-  position,
-  rotation = [0, 0, 0],
-  args = [0.22, 0.22, 0.15],
-  radius = 0.05,
-  color = '#151515',
-  hoverColor = '#222222',
-  onClick,
-  id,
-  name,
-  children
-}) => {
-  const { soundOn, setActiveHotspot, addLog } = useAppContext();
-  const [hovered, setHovered] = useState(false);
-  const [pressed, setPressed] = useState(false);
-  const groupRef = useRef<THREE.Group>(null);
-
-  const handlePointerOver = (e: any) => {
-    e.stopPropagation();
-    setHovered(true);
-    document.body.style.cursor = 'pointer';
-    if (id) {
-      setActiveHotspot(id);
-    }
-  };
-
-  const handlePointerOut = (e: any) => {
-    e.stopPropagation();
-    setHovered(false);
-    document.body.style.cursor = 'auto';
-  };
-
-  const handlePointerDown = (e: any) => {
-    e.stopPropagation();
-    setPressed(true);
-    if (soundOn) {
-      playClickSound(false);
-    }
-    if (onClick) {
-      onClick();
-    }
-  };
-
-  const handlePointerUp = (e: any) => {
-    e.stopPropagation();
-    setPressed(false);
-    if (soundOn) {
-      playClickSound(true);
-    }
-  };
-
-  return (
-    <group
-      ref={groupRef}
-      position={position}
-      rotation={rotation}
-      scale={pressed ? [0.9, 0.9, 0.9] : hovered ? [1.02, 1.02, 1.02] : [1, 1, 1]}
-      onPointerOver={handlePointerOver}
-      onPointerOut={handlePointerOut}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
-    >
-      <RoundedBox args={args} radius={radius} smoothness={4} castShadow receiveShadow>
-        <meshPhysicalMaterial
-          color={pressed ? '#4ade80' : hovered ? hoverColor : color}
-          roughness={0.6}
-          metalness={0.1}
-          clearcoat={0.1}
-        />
-      </RoundedBox>
-      {children}
-    </group>
-  );
-};
-
-// Physical slider switch with drag deactivation, raycasting mapping, and boundary clamping
-interface SlideSwitchProps {
-  position: [number, number, number];
-  onToggle: (on: boolean) => void;
-  isOn: boolean;
-}
-
-export const PhysicalSlideSwitch: React.FC<SlideSwitchProps> = ({ position, onToggle, isOn }) => {
-  const { soundOn, setActiveHotspot } = useAppContext();
-  const { controls } = useThree() as any;
-  const groupRef = useRef<THREE.Group>(null);
-  const [dragging, setDragging] = useState(false);
-  const [knobX, setKnobX] = useState(isOn ? 0.15 : -0.15);
-
-  useEffect(() => {
-    setKnobX(isOn ? 0.15 : -0.15);
-  }, [isOn]);
-
-  const handlePointerDown = (e: any) => {
-    e.stopPropagation();
-    setDragging(true);
-    if (controls) {
-      controls.enabled = false;
-    }
-    document.body.style.cursor = 'grabbing';
-    setActiveHotspot('light_switch');
-  };
-
-  const handlePointerMove = (e: any) => {
-    if (!dragging) return;
-    e.stopPropagation();
-    if (groupRef.current) {
-      const localPoint = groupRef.current.worldToLocal(e.point.clone());
-      const clampedX = Math.max(-0.2, Math.min(0.2, localPoint.x));
-      setKnobX(clampedX);
-      const currentOn = clampedX > 0;
-      if (currentOn !== isOn) {
-        onToggle(currentOn);
-        if (soundOn) {
-          playSlideSound();
-        }
-      }
-    }
-  };
-
-  const handlePointerUp = (e: any) => {
-    if (!dragging) return;
-    e.stopPropagation();
-    setDragging(false);
-    if (controls) {
-      controls.enabled = true;
-    }
-    document.body.style.cursor = 'auto';
-    const finalOn = knobX > 0;
-    setKnobX(finalOn ? 0.15 : -0.15);
-    onToggle(finalOn);
-  };
-
-  return (
-    <group
-      ref={groupRef}
-      position={position}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        document.body.style.cursor = dragging ? 'grabbing' : 'grab';
-        setActiveHotspot('light_switch');
-      }}
-      onPointerOut={(e) => {
-        if (!dragging) {
-          document.body.style.cursor = 'auto';
-        }
-      }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-    >
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[0.55, 0.18, 0.08]} />
-        <meshPhysicalMaterial color="#0f1112" roughness={0.8} metalness={0.5} />
-      </mesh>
-      <group position={[knobX, 0, 0.05]}>
-        <mesh castShadow>
-          <boxGeometry args={[0.16, 0.14, 0.1]} />
-          <meshPhysicalMaterial
-            color={isOn ? '#4ade80' : '#cfd1d4'}
-            emissive={isOn ? '#4ade80' : '#000000'}
-            emissiveIntensity={isOn ? 0.7 : 0}
-            roughness={0.2}
-            metalness={0.6}
-          />
-        </mesh>
-        <mesh position={[0, 0, 0.06]}>
-          <boxGeometry args={[0.03, 0.12, 0.02]} />
-          <meshBasicMaterial color="#111" />
-        </mesh>
-      </group>
-    </group>
-  );
-};
-
 
 export const JoystickModel: React.FC = () => {
   const {
@@ -204,574 +14,515 @@ export const JoystickModel: React.FC = () => {
     activeHotspot,
     setActiveHotspot,
     addLog,
-    language
+    soundOn,
+    displayMode
   } = useAppContext();
 
-  const faceplateRef = useRef<THREE.Group>(null);
-  
-  const stickLRef = useRef<THREE.Group>(null);
-  const stickRRef = useRef<THREE.Group>(null);
-  
+  const { controls } = useThree() as any;
+
+  // 1. LOAD BOTH THE PHOTOREAL SCAN AND DYNAMIC BLENDER MODELS
+  const { scene: rawScanScene } = useGLTF('/models/gp53.glb');
+  const { scene: rawBlenderScene } = useGLTF('/models/gp53_blender.glb');
+
+  // Refs for scene groups to perform global hovering and vibration noise on
+  const mainGroupRef = useRef<THREE.Group>(null);
+
+  const scanScene = useMemo(() => {
+    const cloned = rawScanScene.clone();
+    const box = new THREE.Box3().setFromObject(cloned);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    
+    // Standardize to 1.85 units wide
+    const scaleFactor = 1.85 / maxDim;
+    cloned.scale.setScalar(scaleFactor);
+    
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    // Center perfectly at local scene origin
+    cloned.position.sub(center.multiplyScalar(scaleFactor));
+    
+    // Shadow support & raw materials
+    cloned.traverse((node: any) => {
+      if (node.isMesh) {
+        node.castShadow = true;
+        node.receiveShadow = true;
+      }
+    });
+
+    return cloned;
+  }, [rawScanScene]);
+
+  const blenderScene = useMemo(() => {
+    const cloned = rawBlenderScene.clone();
+    const box = new THREE.Box3().setFromObject(cloned);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+    
+    // Match photoreal scan sizing exactly
+    const scaleFactor = 1.85 / maxDim;
+    cloned.scale.setScalar(scaleFactor);
+    
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    cloned.position.sub(center.multiplyScalar(scaleFactor));
+    
+    // --- FAITHFUL PHYSICAL BUTTON DETAILS PIXEL-PERFECT FIXES ---
+    // Fix triangle icon local pivot translation (loaded at global origin in raw asset)
+    const iconTri = cloned.getObjectByName('button_triangle_icon');
+    if (iconTri) {
+      iconTri.position.set(0, 0, 0.11);
+    }
+    // Disable or hide redundant crescent-style circle icon cutout to secure a solid clean circle Symbol
+    const iconCircCutout = cloned.getObjectByName('button_circle_icon_cutout');
+    if (iconCircCutout) {
+      iconCircCutout.visible = false;
+    }
+    
+    // Shadow support & Material tuning to secure a state-of-the-art cinematic look
+    cloned.traverse((node: any) => {
+      if (node.isMesh) {
+        node.castShadow = true;
+        node.receiveShadow = true;
+        
+        if (node.material) {
+          const mat = node.material.clone() as THREE.MeshPhysicalMaterial;
+          node.material = mat;
+
+          // Apply gorgeous high-end plastic stippling/materials directly
+          const name = node.name.toLowerCase();
+          if (name.includes('body_front_shell') || name.includes('handle_bulge') || name.includes('body_side_wall')) {
+            mat.color.set('#0b0d0e');
+            mat.roughness = 0.5;
+            mat.metalness = 0.15;
+            mat.clearcoat = 0.04;
+            mat.clearcoatRoughness = 0.5;
+          } else if (name.includes('rubber') || name.includes('grip') || name.includes('grain')) {
+            mat.color.set('#030304');
+            mat.roughness = 0.95;
+            mat.metalness = 0.02;
+          } else if (name === 'dpad_up' || name === 'dpad_down' || name === 'dpad_left' || name === 'dpad_right') {
+            // Elegant satin metallic keys contrasting with the dark circular dish base
+            mat.color.set('#3a3f44');
+            mat.roughness = 0.25;
+            mat.metalness = 0.45;
+            mat.clearcoat = 0.3;
+          } else if (name.includes('dpad')) {
+            // High visibility dark anthracite styling for the navigation dish
+            mat.color.set('#111315');
+            mat.roughness = 0.65;
+            mat.metalness = 0.1;
+          } else if (name === 'button_triangle' || name === 'button_square' || name === 'button_circle' || name === 'button_cross') {
+            // Ultra premium mirror glossy action key bases
+            mat.color.set('#121315');
+            mat.roughness = 0.12;
+            mat.metalness = 0.35;
+            mat.clearcoat = 0.9;
+            mat.clearcoatRoughness = 0.05;
+          } else if (name.includes('button') || name.includes('well')) {
+            mat.color.set('#0f1113');
+            mat.roughness = 0.25;
+            mat.metalness = 0.2;
+            mat.clearcoat = 0.5;
+            mat.clearcoatRoughness = 0.1;
+          } else if (name.includes('touchpad') || name.includes('recess')) {
+            mat.color.set('#070809');
+            mat.roughness = 0.4;
+            mat.metalness = 0.05;
+            mat.clearcoat = 0.1;
+          } else if (name.includes('logo') || name.includes('spur')) {
+            mat.color.set('#e11d48');
+            mat.roughness = 0.2;
+            mat.emissive.set('#e11d48');
+            mat.emissiveIntensity = 2.0;
+          }
+        }
+      }
+    });
+
+    return cloned;
+  }, [rawBlenderScene]);
+
+  // Index sub-meshes for O(1) animation access
+  const blenderParts = useMemo(() => {
+    const parts: Record<string, THREE.Object3D> = {};
+    blenderScene.traverse((node) => {
+      if (node.isObject3D) {
+        parts[node.name] = node;
+      }
+    });
+    return parts;
+  }, [blenderScene]);
+
+  // 3. MOTION INPUT & PRESS STATE VARIABLES
   const [lTilt, setLTilt] = useState({ x: 0, y: 0 });
   const [rTilt, setRTilt] = useState({ x: 0, y: 0 });
   const [lDragging, setLDragging] = useState(false);
   const [rDragging, setRDragging] = useState(false);
-  
-  const { controls } = useThree() as any;
 
+  // Tracks active depressed button offsets
+  const [pressedButtons, setPressedButtons] = useState<Record<string, boolean>>({});
+
+  // 4. NODE DETECTOR TO SYNC CODES TO HOVER WIDGETS
+  const getHotspotIdFromNodeName = (name: string): string | null => {
+    const n = name.toLowerCase();
+    if (n.includes('stick_left')) return 'left_stick';
+    if (n.includes('stick_right')) return 'right_stick';
+    if (n.includes('dpad')) return 'dpad';
+    if (n.includes('button_triangle') || n.includes('button_circle') || n.includes('button_cross') || n.includes('button_square')) return 'action_buttons';
+    if (n.includes('home')) return 'home_button';
+    if (n.includes('turbo')) return 'turbo_button';
+    if (n.includes('light_button') || n.includes('light_icon')) return 'light_switch';
+    if (n.includes('m1_') || n.includes('m2_') || n.includes('paddle')) return 'paddles';
+    if (n.includes('usb') || n.includes('u_cutout')) return 'usb_port';
+    if (n.includes('logo') || n.includes('touchpad')) return 'touchpad';
+    return null;
+  };
+
+  // 5. ANIMATE EVERY FRAME
   useFrame(({ clock }) => {
-    if (faceplateRef.current && deviceState !== 'off') {
-      const t = clock.getElapsedTime();
-      faceplateRef.current.position.y = Math.sin(t * 1.5) * 0.04;
-      faceplateRef.current.rotation.y = Math.sin(t * 0.8) * 0.03;
-      faceplateRef.current.rotation.x = Math.cos(t * 0.6) * 0.02;
+    const t = clock.getElapsedTime();
 
-      if (deviceState === 'vibrating') {
-        faceplateRef.current.position.x = (Math.random() - 0.5) * 0.05;
-        faceplateRef.current.position.y += (Math.random() - 0.5) * 0.05;
-        faceplateRef.current.position.z = (Math.random() - 0.5) * 0.05;
+    // Constant cinematic idle breath & vibration engine
+    if (mainGroupRef.current) {
+      if (deviceState !== 'off') {
+        const floatSpeed = deviceState === 'calibrating' ? 3.0 : 1.5;
+        const floatHeave = deviceState === 'calibrating' ? 0.08 : 0.03;
+        mainGroupRef.current.position.y = Math.sin(t * floatSpeed) * floatHeave;
+        mainGroupRef.current.rotation.y = Math.sin(t * 0.7) * 0.025;
+        mainGroupRef.current.rotation.x = Math.cos(t * 0.5) * 0.015;
+
+        if (deviceState === 'vibrating') {
+          // Double intensity tactile shake
+          mainGroupRef.current.position.x = (Math.random() - 0.5) * 0.045;
+          mainGroupRef.current.position.y += (Math.random() - 0.5) * 0.045;
+          mainGroupRef.current.position.z = (Math.random() - 0.5) * 0.045;
+        } else {
+          mainGroupRef.current.position.x = 0;
+        }
       } else {
-        faceplateRef.current.position.x = 0;
+        // Slowly rest to absolute dead floor center when turned off
+        mainGroupRef.current.position.set(0, THREE.MathUtils.lerp(mainGroupRef.current.position.y, -0.05, 0.1), 0);
+        mainGroupRef.current.rotation.set(0, 0, 0);
+      }
+    }
+
+    // Interactive Model Mesh animations (sticks tilt, buttons push, LEDs flare)
+    if (displayMode === 'interactive') {
+      // Smoothly tilt analogues with rubber elastic dampening
+      const stickLeft = blenderParts['stick_left_cap'];
+      if (stickLeft) {
+        stickLeft.rotation.x = THREE.MathUtils.lerp(stickLeft.rotation.x, lTilt.y * 0.35, 0.2);
+        // Tilt Z matches horizontal steer
+        stickLeft.rotation.z = THREE.MathUtils.lerp(stickLeft.rotation.z, -lTilt.x * 0.35, 0.2);
+      }
+
+      const stickRight = blenderParts['stick_right_cap'];
+      if (stickRight) {
+        stickRight.rotation.x = THREE.MathUtils.lerp(stickRight.rotation.x, rTilt.y * 0.35, 0.2);
+        stickRight.rotation.z = THREE.MathUtils.lerp(stickRight.rotation.z, -rTilt.x * 0.35, 0.2);
+      }
+
+      // Smooth mechanical key travel for clicked elements (push along button normal -Y)
+      const pressableKeys = [
+        'button_triangle', 'button_circle', 'button_cross', 'button_square',
+        'dpad_up', 'dpad_down', 'dpad_left', 'dpad_right',
+        'home_button', 'turbo_button', 'm1_button', 'm2_button'
+      ];
+
+      pressableKeys.forEach((key) => {
+        const node = blenderParts[key];
+        if (node) {
+          const isPressed = pressedButtons[key];
+          // Depress slightly on Y axis (towards the printed board inside)
+          const targetY = isPressed ? -0.05 : 0;
+          node.position.y = THREE.MathUtils.lerp(node.position.y, targetY, 0.25);
+        }
+      });
+
+      // LED BACKPLATE INDICATORS & STEER WELL GLOW RINGS
+      const activeLEDs = deviceState !== 'off' && lightOn;
+      const glowRingColor = deviceState === 'turbo' 
+        ? new THREE.Color('#fbbf24') // Turbo rapid amber
+        : deviceState === 'calibrating'
+          ? new THREE.Color('#3b82f6') // Calibrating deep neon-blue
+          : new THREE.Color('#22c55e'); // Green default gaming state
+
+      // Left & Right LED circles plus bottom panel trim bars glow
+      const meshLEDNodes = [
+        'stick_left_led_ring',
+        'stick_right_led_ring',
+        'led_frame_left',
+        'led_frame_bottom',
+        'led_frame_right'
+      ];
+
+      meshLEDNodes.forEach((name) => {
+        const mesh = blenderParts[name] as THREE.Mesh;
+        if (mesh && mesh.material) {
+          const mat = mesh.material as THREE.MeshPhysicalMaterial;
+          mat.emissive = activeLEDs ? glowRingColor : new THREE.Color('#142a1a');
+          mat.emissiveIntensity = activeLEDs ? 2.5 : 0.05;
+        }
+      });
+
+      // Dynamic PlayStation PlayStation button brand glows
+      const iconTri = blenderParts['button_triangle_icon'] as THREE.Mesh;
+      if (iconTri && iconTri.material) {
+        const mat = iconTri.material as THREE.MeshPhysicalMaterial;
+        mat.emissive = activeLEDs ? new THREE.Color('#4ade80') : new THREE.Color('#1e1e1e');
+        mat.emissiveIntensity = activeLEDs ? 3.0 : 0.01;
+        mat.color = activeLEDs ? new THREE.Color('#4ade80') : new THREE.Color('#888888');
+      }
+
+      ['button_square_icon_0', 'button_square_icon_1', 'button_square_icon_2', 'button_square_icon_3'].forEach(name => {
+        const iconSqr = blenderParts[name] as THREE.Mesh;
+        if (iconSqr && iconSqr.material) {
+          const mat = iconSqr.material as THREE.MeshPhysicalMaterial;
+          mat.emissive = activeLEDs ? new THREE.Color('#f472b6') : new THREE.Color('#1e1e1e');
+          mat.emissiveIntensity = activeLEDs ? 3.0 : 0.01;
+          mat.color = activeLEDs ? new THREE.Color('#f472b6') : new THREE.Color('#888888');
+        }
+      });
+
+      const iconCirc = blenderParts['button_circle_icon'] as THREE.Mesh;
+      if (iconCirc && iconCirc.material) {
+        const mat = iconCirc.material as THREE.MeshPhysicalMaterial;
+        mat.emissive = activeLEDs ? new THREE.Color('#f87171') : new THREE.Color('#1e1e1e');
+        mat.emissiveIntensity = activeLEDs ? 3.0 : 0.01;
+        mat.color = activeLEDs ? new THREE.Color('#f87171') : new THREE.Color('#888888');
+      }
+
+      ['button_cross_icon_a', 'button_cross_icon_b'].forEach(name => {
+        const iconCrs = blenderParts[name] as THREE.Mesh;
+        if (iconCrs && iconCrs.material) {
+          const mat = iconCrs.material as THREE.MeshPhysicalMaterial;
+          mat.emissive = activeLEDs ? new THREE.Color('#60a5fa') : new THREE.Color('#1e1e1e');
+          mat.emissiveIntensity = activeLEDs ? 3.0 : 0.01;
+          mat.color = activeLEDs ? new THREE.Color('#60a5fa') : new THREE.Color('#888888');
+        }
+      });
+
+      // Red central Touchpad glow logo (pulsing effect when idle / vibrating)
+      const logoNodes = ['xtrike_red_logo', 'xtrike_logo_x_upper', 'xtrike_logo_x_lower', 'xtrike_logo_x_left_spur'];
+      const logoColor = deviceState !== 'off' ? new THREE.Color('#ef4444') : new THREE.Color('#310b0b');
+      const pulseMultiplier = deviceState === 'vibrating' 
+        ? 1.0 + Math.sin(t * 24.0) * 0.4 // high frequency pulse
+        : deviceState === 'turbo'
+          ? 1.0 + Math.sin(t * 12.0) * 0.25
+          : 0.8 + Math.sin(t * 2.5) * 0.15; // smooth breath pulse
+
+      logoNodes.forEach((name) => {
+        const mesh = blenderParts[name] as THREE.Mesh;
+        if (mesh && mesh.material) {
+          const mat = mesh.material as THREE.MeshPhysicalMaterial;
+          mat.emissive = logoColor;
+          mat.emissiveIntensity = deviceState !== 'off' ? 2.2 * pulseMultiplier : 0.02;
+        }
+      });
+
+      // Rear slides button slider translation
+      const slideBtn = blenderParts['light_button'];
+      if (slideBtn) {
+        const targetX = lightOn ? 0.06 : -0.06;
+        slideBtn.position.x = THREE.MathUtils.lerp(slideBtn.position.x, targetX, 0.2);
       }
     }
   });
 
-  const handleLStickDown = (e: any) => {
+  // 6. RAYCAST HANDLERS FOR MOUSE INGESTION (Analog dragging & tactile hits)
+  const handlePointerDown = (e: any) => {
     e.stopPropagation();
-    setLDragging(true);
-    if (controls) controls.enabled = false;
-    setActiveHotspot('left_stick');
-  };
+    const name = e.object.name || '';
+    const hsId = getHotspotIdFromNodeName(name);
+    
+    if (hsId) {
+      setActiveHotspot(hsId);
+    }
 
-  const handleLStickMove = (e: any) => {
-    if (!lDragging) return;
-    e.stopPropagation();
-    if (stickLRef.current) {
-      const local = stickLRef.current.worldToLocal(e.point.clone());
-      const x = Math.max(-1, Math.min(1, local.x * 5.0));
-      const y = Math.max(-1, Math.min(1, -local.y * 5.0));
-      setLTilt({ x, y });
-      addLog(
-        `LX: ${x.toFixed(2)} | LY: ${y.toFixed(2)}`,
-        `ציר סטיק שמאלי - LX: ${x.toFixed(2)} | LY: ${y.toFixed(2)}`
-      );
+    if (deviceState === 'off' && !name.includes('home_button')) {
+      addLog('Wake the controller up with the Home button first', 'יש להעיר את הבקר בעזרת לחצן הבית תחילה');
+      return;
+    }
+
+    // Left analog steer mode engagement
+    if (name.includes('stick_left')) {
+      setLDragging(true);
+      if (controls) controls.enabled = false;
+      return;
+    }
+
+    // Right analog steer mode engagement
+    if (name.includes('stick_right')) {
+      setRDragging(true);
+      if (controls) controls.enabled = false;
+      return;
+    }
+
+    // Detect clicked parts of interest
+    let pressedKey: string | null = null;
+    let logEn = '';
+    let logHe = '';
+
+    if (name.includes('button_triangle')) {
+      pressedKey = 'button_triangle';
+      logEn = 'Action BUTTON: △ pressed';
+      logHe = 'נלחץ מקש פעולה: △';
+    } else if (name.includes('button_circle')) {
+      pressedKey = 'button_circle';
+      logEn = 'Action BUTTON: ◯ pressed';
+      logHe = 'נלחץ מקש פעולה: ◯';
+    } else if (name.includes('button_cross')) {
+      pressedKey = 'button_cross';
+      logEn = 'Action BUTTON: ╳ pressed';
+      logHe = 'נלחץ מקש פעולה: ╳';
+    } else if (name.includes('button_square')) {
+      pressedKey = 'button_square';
+      logEn = 'Action BUTTON: ▢ pressed';
+      logHe = 'נלחץ מקש פעולה: ▢';
+    } else if (name.includes('dpad_up')) {
+      pressedKey = 'dpad_up';
+      logEn = 'D-Pad: UP arrow pressed';
+      logHe = 'לחיצה על צלב הכיוונים: למעלה';
+    } else if (name.includes('dpad_down')) {
+      pressedKey = 'dpad_down';
+      logEn = 'D-Pad: DOWN arrow pressed';
+      logHe = 'לחיצה על צלב הכיוונים: למטה';
+    } else if (name.includes('dpad_left')) {
+      pressedKey = 'dpad_left';
+      logEn = 'D-Pad: LEFT arrow pressed';
+      logHe = 'לחיצה על צלב הכיוונים: שמאלה';
+    } else if (name.includes('dpad_right')) {
+      pressedKey = 'dpad_right';
+      logEn = 'D-Pad: RIGHT arrow pressed';
+      logHe = 'לחיצה על צלב הכיוונים: ימינה';
+    } else if (name.includes('home_button')) {
+      pressedKey = 'home_button';
+      if (deviceState === 'off') {
+        setDeviceState('idle');
+        logEn = 'Controller powered UP (Mode LED activated)';
+        logHe = 'הבקר הופעל בהצלחה (נורת בקרה דולקת)';
+        playPowerBeep(true);
+      } else {
+        setDeviceState('off');
+        logEn = 'Controller entered SLEEP MODE';
+        logHe = 'הבקר הועבר למצב שינה';
+        playPowerBeep(false);
+      }
+    } else if (name.includes('turbo_button')) {
+      pressedKey = 'turbo_button';
+      const targetState = deviceState === 'turbo' ? 'idle' : 'turbo';
+      setDeviceState(targetState);
+      logEn = targetState === 'turbo' ? 'Turbo fire mode ENABLED' : 'Turbo fire mode DEACTIVATED';
+      logHe = targetState === 'turbo' ? 'מצב טורבו ירי מהיר פעיל' : 'מצב טורבו הופסק';
+    } else if (name.includes('light_button')) {
+      pressedKey = 'light_button';
+      const nextLight = !lightOn;
+      setLightOn(nextLight);
+      logEn = `LED lighting system toggled: ${nextLight ? 'ON' : 'OFF'}`;
+      logHe = `בורר תאורה שונה בגב: ${nextLight ? 'פעיל' : 'כבוי'}`;
+      if (soundOn) playSlideSound();
+    } else if (name.includes('m1_button')) {
+      pressedKey = 'm1_button';
+      logEn = 'Rear paddle M1 triggered';
+      logHe = 'לחצן מאקרו אחורי M1 הופעל';
+    } else if (name.includes('m2_button')) {
+      pressedKey = 'm2_button';
+      logEn = 'Rear paddle M2 triggered';
+      logHe = 'לחצן מאקרו אחורי M2 הופעל';
+    }
+
+    if (pressedKey) {
+      setPressedButtons((prev) => ({ ...prev, [pressedKey!]: true }));
+      if (soundOn) playClickSound(false);
+      if (logEn) addLog(logEn, logHe);
     }
   };
 
-  const handleLStickUp = (e: any) => {
+  const handlePointerMove = (e: any) => {
+    const name = e.object.name || '';
+    const hsId = getHotspotIdFromNodeName(name);
+
+    if (hsId && !lDragging && !rDragging) {
+      // Synchronize 3D hovering to sidebar highlights instantly
+      setActiveHotspot(hsId);
+    }
+
+    if (lDragging && blenderGroupRef.current) {
+      // Steer Left Analog
+      const local = blenderGroupRef.current.worldToLocal(e.point.clone());
+      const dx = Math.max(-1, Math.min(1, (local.x + 0.35) * 5.0));
+      const dy = Math.max(-1, Math.min(1, (local.y + 0.2) * 5.0));
+      setLTilt({ x: dx, y: dy });
+      addLog(`Analog Left - LX: ${dx.toFixed(2)} | LY: ${dy.toFixed(2)}`, `סטיק שמאלי - LX: ${dx.toFixed(2)} | LY: ${dy.toFixed(2)}`);
+    }
+
+    if (rDragging && blenderGroupRef.current) {
+      // Steer Right Analog
+      const local = blenderGroupRef.current.worldToLocal(e.point.clone());
+      const dx = Math.max(-1, Math.min(1, (local.x - 0.35) * 5.0));
+      const dy = Math.max(-1, Math.min(1, (local.y + 0.2) * 5.0));
+      setRTilt({ x: dx, y: dy });
+      addLog(`Analog Right - RX: ${dx.toFixed(2)} | RY: ${dy.toFixed(2)}`, `סטיק ימני - RX: ${dx.toFixed(2)} | LY: ${dy.toFixed(2)}`);
+    }
+  };
+
+  const handlePointerUp = () => {
     setLDragging(false);
-    if (controls) controls.enabled = true;
-    setLTilt({ x: 0, y: 0 });
-  };
-
-  const handleRStickDown = (e: any) => {
-    e.stopPropagation();
-    setRDragging(true);
-    if (controls) controls.enabled = false;
-    setActiveHotspot('right_stick');
-  };
-
-  const handleRStickMove = (e: any) => {
-    if (!rDragging) return;
-    e.stopPropagation();
-    if (stickRRef.current) {
-      const local = stickRRef.current.worldToLocal(e.point.clone());
-      const x = Math.max(-1, Math.min(1, local.x * 5.0));
-      const y = Math.max(-1, Math.min(1, -local.y * 5.0));
-      setRTilt({ x, y });
-      addLog(
-        `RX: ${x.toFixed(2)} | RY: ${y.toFixed(2)}`,
-        `ציר סטיק ימני - RX: ${x.toFixed(2)} | RY: ${y.toFixed(2)}`
-      );
-    }
-  };
-
-  const handleRStickUp = (e: any) => {
     setRDragging(false);
     if (controls) controls.enabled = true;
+    setLTilt({ x: 0, y: 0 });
     setRTilt({ x: 0, y: 0 });
+
+    // Release all depressed keys with organic clack audio feedback
+    setPressedButtons((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => {
+        if (next[k]) {
+          next[k] = false;
+          if (soundOn) playClickSound(true);
+        }
+      });
+      return next;
+    });
   };
 
-  const togglePower = () => {
-    if (deviceState === 'off') {
-      setDeviceState('idle');
-      addLog('Controller turned ON (Home selector active)', 'הבקר הופעל (לחצן בית דלוק)');
-      playPowerBeep(true);
-    } else {
-      setDeviceState('off');
-      addLog('Controller turned OFF', 'הבקר כובה');
-      playPowerBeep(false);
-    }
-  };
-
-  // True black aesthetics inspired by the reference image
-  const bodyMaterial = new THREE.MeshPhysicalMaterial({
-    color: '#0a0a0a', // Deep matte black faceplate
-    roughness: 0.65,
-    metalness: 0.25,
-    clearcoat: 0.05,
-    clearcoatRoughness: 0.4
-  });
-
-  const gripRubberMaterial = new THREE.MeshPhysicalMaterial({
-    color: '#020202', // Darker stippled grips
-    roughness: 0.95,
-    metalness: 0.05,
-    clearcoat: 0.0,
-    bumpScale: 0.1,
-  });
-
-  const neonLEDMaterial = new THREE.MeshBasicMaterial({
-    color: lightOn && deviceState !== 'off' ? '#4ade80' : '#14311c'
-  });
+  const blenderGroupRef = useRef<THREE.Group>(null);
+  const scanGroupRef = useRef<THREE.Group>(null);
 
   return (
-    <group ref={faceplateRef} position={[0, 0, 0]}>
-      {/* 1. LEFT GRIP HANDLE (TEXTURIZED EMBEDDED DUAL-SPHERE BASE FOR THICKNESS) */}
-      <group position={[-1.25, -0.6, 0.0]} rotation={[0.1, 0.1, Math.PI / 6.5]}>
-        <mesh castShadow receiveShadow material={deviceState !== 'off' ? gripRubberMaterial : bodyMaterial}>
-          <capsuleGeometry args={[0.42, 1.1, 16, 16]} />
-        </mesh>
-      </group>
-
-      {/* 2. RIGHT GRIP HANDLE */}
-      <group position={[1.25, -0.6, 0.0]} rotation={[0.1, -0.1, -Math.PI / 6.5]}>
-        <mesh castShadow receiveShadow material={deviceState !== 'off' ? gripRubberMaterial : bodyMaterial}>
-          <capsuleGeometry args={[0.42, 1.1, 16, 16]} />
-        </mesh>
-      </group>
-
-      {/* 3. CORE FRONT BODY (ERGONOMIC FLAT ROUNDED BRIDGE) */}
-      <RoundedBox args={[2.5, 1.5, 0.65]} radius={0.3} smoothness={4} castShadow receiveShadow>
-        <primitive object={bodyMaterial} attach="material" />
-      </RoundedBox>
-
-      {/* 4. UPPER BRIDGE BACKING */}
-      <group position={[0, 0.5, -0.15]}>
-        <mesh castShadow receiveShadow material={bodyMaterial}>
-          <boxGeometry args={[1.8, 0.4, 0.4]} />
-        </mesh>
-      </group>
-
-      {/* 5. CAPACITIVE TOUCHPAD PLATED HOUSING (Top Center, Deep Black, Red Text) */}
-      <group position={[0, 0.58, 0.28]} rotation={[-0.05, 0, 0]}>
-        {/* Under-plate recessed rim outline */}
-        <mesh receiveShadow position={[0, 0, -0.01]}>
-           <boxGeometry args={[1.48, 0.62, 0.04]} />
-           <meshPhysicalMaterial color="#050505" roughness={0.8} />
-        </mesh>
-
-        <mesh
-          castShadow
-          receiveShadow
-          onPointerOver={() => setActiveHotspot('touchpad')}
-        >
-          {/* Main touchpad plastic */}
-          <boxGeometry args={[1.44, 0.6, 0.04]} />
-          <meshPhysicalMaterial
-            color="#090909"
-            roughness={0.4}
-            metalness={0.1}
-            clearcoat={0.15}
-          />
-        </mesh>
-        
-        {/* Silk-screen Xtrike red branding */}
-        <Html transform scale={0.1} position={[0, 0.12, 0.025]} className="pointer-events-none select-none">
-          <div 
-            className="font-display font-black text-center tracking-widest pointer-events-none"
-            style={{ 
-              color: '#d62d2d', 
-              fontSize: '18px',
-              fontFamily: "'Trebuchet MS', sans-serif",
-              letterSpacing: '1px'
-            }}
-          >
-            XTRIKE ME
-          </div>
-        </Html>
-      </group>
-
-      {/* 6. SELECT AND START OPTION PILLS (Left and Right of Touchpad) */}
-      <group position={[-1.0, 0.6, 0.3]} rotation={[0, 0, 0.2]}>
-        <PressableDeviceButton
-          position={[0, 0, 0]}
-          args={[0.08, 0.18, 0.15]}
-          radius={0.02}
-          color="#151515"
-          onClick={() => addLog('Share/Select button pressed', 'נלחץ מקש Share/Select')}
-        />
-        <Html transform position={[0, 0.15, 0.07]} scale={0.05} className="pointer-events-none">
-          <div className="text-white text-[10px] font-bold">|||</div>
-        </Html>
-      </group>
-
-      <group position={[1.0, 0.6, 0.3]} rotation={[0, 0, -0.2]}>
-        <PressableDeviceButton
-          position={[0, 0, 0]}
-          args={[0.08, 0.18, 0.15]}
-          radius={0.02}
-          color="#151515"
-          onClick={() => addLog('Options/Start button pressed', 'נלחץ מקש Options/Start')}
-        />
-        <Html transform position={[0, 0.15, 0.07]} scale={0.05} className="pointer-events-none">
-          <div className="text-white text-[10px] font-bold">≡</div>
-        </Html>
-      </group>
-
-      {/* 7. MIDDLE SECTION: SPEAKER V-CUTS, HOME, TURBO */}
-      <group position={[0, 0.05, 0.325]}>
-        {/* V-shaped Speaker/LED Slits */}
-        <group position={[0, 0.08, 0.01]}>
-           <mesh position={[-0.15, 0, 0]} rotation={[0, 0, -0.5]}>
-             <boxGeometry args={[0.1, 0.02, 0.02]} />
-             <meshBasicMaterial color="#000" />
-           </mesh>
-           <mesh position={[0, 0, 0]}>
-             <boxGeometry args={[0.08, 0.02, 0.02]} />
-             <meshBasicMaterial color="#000" />
-           </mesh>
-           <mesh position={[0.15, 0, 0]} rotation={[0, 0, 0.5]}>
-             <boxGeometry args={[0.1, 0.02, 0.02]} />
-             <meshBasicMaterial color="#000" />
-           </mesh>
+    <group
+      ref={mainGroupRef}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        const hoveredName = e.object.name || '';
+        const hs = getHotspotIdFromNodeName(hoveredName);
+        if (hs) {
+          setActiveHotspot(hs);
+          document.body.style.cursor = 'pointer';
+        }
+      }}
+      onPointerOut={() => {
+        if (!lDragging && !rDragging) {
+          document.body.style.cursor = 'auto';
+        }
+      }}
+    >
+      {/* RENDER THE USER'S CHOSEN FIDELITY MODEL NATIVELY AS EXCLUSIVE ONLY ONE COHESIVE OBJECT */}
+      {displayMode === 'interactive' ? (
+        <group ref={blenderGroupRef}>
+          <primitive object={blenderScene} />
         </group>
-
-        {/* Glossy Home Button Area */}
-        <group position={[0, -0.12, 0]}>
-           {/* Recessed Glossy Ring */}
-           <mesh position={[0, 0, 0.01]}>
-             <cylinderGeometry args={[0.18, 0.18, 0.02, 32]} />
-             <meshPhysicalMaterial color="#080808" roughness={0.1} metalness={0.9} clearcoat={1.0} />
-             <mesh position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
-               {/* Just to angle the cylinder correctly if needed, but wait: cylinder is oriented along Y by default */}
-             </mesh>
-           </mesh>
-
-           <group rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.015]}>
-             <PressableDeviceButton
-               position={[0, 0.02, 0]}
-               args={[0.26, 0.1, 0.26]}
-               radius={0.13}
-               color="#151515"
-               id="home_button"
-               onClick={togglePower}
-             >
-               <Html transform position={[0, -0.06, 0]} rotation={[-Math.PI/2, 0, 0]} scale={0.06} className="pointer-events-none select-none">
-                 <div className="flex items-center justify-center w-[20px] h-[20px] bg-white rounded-[4px] shadow-[0_0_8px_rgba(255,255,255,0.5)]">
-                   {/* Home House Icon inside white rounded rect */}
-                   <span className="text-[#000] text-[12px] leading-none mb-[2px]">⌂</span>
-                 </div>
-               </Html>
-             </PressableDeviceButton>
-           </group>
+      ) : (
+        <group ref={scanGroupRef}>
+          <primitive object={scanScene} />
         </group>
-
-        {/* Turbo Button */}
-        <group position={[0, -0.38, 0.01]}>
-           <PressableDeviceButton
-             position={[0, 0, 0]}
-             args={[0.25, 0.08, 0.08]}
-             radius={0.04}
-             color="#1c1f22"
-             id="turbo_button"
-             onClick={() => {
-               if (deviceState === 'off') return;
-               if (deviceState === 'turbo') {
-                 setDeviceState('idle');
-                 addLog('Turbo mode DEACTIVATED', 'מצב טורבו בוטל');
-               } else {
-                 setDeviceState('turbo');
-                 addLog('Turbo mode ENABLED', 'מצב טורבו הופעל - מוכן לירי מהיר');
-               }
-             }}
-           />
-           <Html transform position={[0, -0.08, 0.03]} scale={0.045} className="pointer-events-none">
-             <span className="font-sans text-gray-400 opacity-90 uppercase tracking-widest font-bold">
-               TURBO
-             </span>
-           </Html>
-        </group>
-      </group>
-
-      {/* 8. DETAILED JOYSTICKS (Left and Right) */}
-      <group
-        ref={stickLRef}
-        position={[-0.55, -0.25, 0.33]}
-        onPointerDown={handleLStickDown}
-        onPointerMove={handleLStickMove}
-        onPointerUp={handleLStickUp}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          document.body.style.cursor = 'grab';
-          setActiveHotspot('left_stick');
-        }}
-        onPointerOut={(e) => {
-          if (!lDragging) document.body.style.cursor = 'auto';
-        }}
-      >
-        {/* Recessed joystick collar housing */}
-        <mesh receiveShadow rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.32, 0.32, 0.08, 32]} />
-          <meshPhysicalMaterial color="#080808" roughness={0.9} />
-        </mesh>
-
-        {/* Joystick stem shaft tilting visual */}
-        <group rotation={[lTilt.y * 0.3, 0, lTilt.x * 0.3]}>
-          {/* Stem handle rod */}
-          <mesh castShadow rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.1]}>
-            <cylinderGeometry args={[0.1, 0.1, 0.2, 16]} />
-            <meshPhysicalMaterial color="#222" metalness={0.6} roughness={0.3} />
-          </mesh>
-
-          {/* Texturized thumbpad top */}
-          <mesh position={[0, 0, 0.2]} castShadow rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.26, 0.22, 0.1, 32]} />
-            <meshPhysicalMaterial color="#111" roughness={0.8} bumpScale={0.05} />
-          </mesh>
-          <mesh position={[0, 0, 0.25]} rotation={[Math.PI / 2, 0, 0]}>
-            {/* Outer grip ridge ring */}
-            <torusGeometry args={[0.22, 0.03, 16, 32]} />
-            <meshPhysicalMaterial color="#0a0a0a" roughness={0.9} />
-          </mesh>
-        </group>
-      </group>
-
-      {/* RIGHT JOYSTICK ASSEMBLY */}
-      <group
-        ref={stickRRef}
-        position={[0.55, -0.25, 0.33]}
-        onPointerDown={handleRStickDown}
-        onPointerMove={handleRStickMove}
-        onPointerUp={handleRStickUp}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          document.body.style.cursor = 'grab';
-          setActiveHotspot('right_stick');
-        }}
-        onPointerOut={(e) => {
-          if (!rDragging) document.body.style.cursor = 'auto';
-        }}
-      >
-        <mesh receiveShadow rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.32, 0.32, 0.08, 32]} />
-          <meshPhysicalMaterial color="#080808" roughness={0.9} />
-        </mesh>
-
-        <group rotation={[rTilt.y * 0.3, 0, rTilt.x * 0.3]}>
-          <mesh castShadow rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.1]}>
-            <cylinderGeometry args={[0.1, 0.1, 0.2, 16]} />
-            <meshPhysicalMaterial color="#222" metalness={0.6} roughness={0.3} />
-          </mesh>
-
-          <mesh position={[0, 0, 0.2]} castShadow rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.26, 0.22, 0.1, 32]} />
-            <meshPhysicalMaterial color="#111" roughness={0.8} bumpScale={0.05} />
-          </mesh>
-          <mesh position={[0, 0, 0.25]} rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[0.22, 0.03, 16, 32]} />
-            <meshPhysicalMaterial color="#0a0a0a" roughness={0.9} />
-          </mesh>
-        </group>
-      </group>
-
-      {/* 9. TACTILE DIRECTIONAL PAD (Left Side Cross) */}
-      <group position={[-0.9, 0.18, 0.32]}>
-        {/* D-Pad Circular Base plate */}
-        <mesh receiveShadow rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.35, 0.38, 0.04, 32]} />
-          <meshPhysicalMaterial color="#050505" />
-        </mesh>
-        
-        {/* Actual cross piece */}
-        <group position={[0, 0, 0.02]}>
-          <PressableDeviceButton
-            position={[0, 0, 0]}
-            args={[0.54, 0.15, 0.06]}
-            radius={0.02}
-            id="dpad"
-            color="#111"
-            onClick={() => addLog('D-Pad horizontal pressed', 'לחיצה על צלב הכיוונים האופקי')}
-          />
-          <PressableDeviceButton
-            position={[0, 0, 0]}
-            rotation={[0, 0, Math.PI / 2]}
-            args={[0.54, 0.15, 0.06]}
-            radius={0.02}
-            id="dpad"
-            color="#111"
-            onClick={() => addLog('D-Pad vertical pressed', 'לחיצה על צלב הכיוונים האנכי')}
-          />
-          {/* Center indent of Dpad */}
-          <mesh position={[0, 0, 0.03]}>
-            <circleGeometry args={[0.08, 16]} />
-            <meshBasicMaterial color="#090909" />
-          </mesh>
-        </group>
-      </group>
-
-      {/* 10. ACTION KEY PADS (Right Side) */}
-      <group position={[0.9, 0.18, 0.32]}>
-        {/* Plate housing collar */}
-        <mesh receiveShadow rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.35, 0.38, 0.04, 32]} />
-          <meshPhysicalMaterial color="#050505" />
-        </mesh>
-
-        <group rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.02]}>
-          {/* Triangle Top */}
-          <PressableDeviceButton
-            position={[0, 0, -0.18]}
-            args={[0.2, 0.1, 0.2]}
-            radius={0.1}
-            onClick={() => addLog('Action BUTTON: △ pressed', 'נלחץ מקש פעולה: △')}
-            id="action_buttons"
-          >
-            <Html transform position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={0.08} className="pointer-events-none">
-              <span className="font-display font-black text-[#eaeaea] select-none text-[13px] leading-none">△</span>
-            </Html>
-          </PressableDeviceButton>
-
-          {/* Circle Right */}
-          <PressableDeviceButton
-            position={[0.18, 0, 0]}
-            args={[0.2, 0.1, 0.2]}
-            radius={0.1}
-            onClick={() => addLog('Action BUTTON: ◯ pressed', 'נלחץ מקש פעולה: ◯')}
-            id="action_buttons"
-          >
-            <Html transform position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={0.08} className="pointer-events-none">
-              <span className="font-display font-black text-[#eaeaea] select-none text-[13px] leading-none">◯</span>
-            </Html>
-          </PressableDeviceButton>
-
-          {/* Cross Bottom */}
-          <PressableDeviceButton
-            position={[0, 0, 0.18]}
-            args={[0.2, 0.1, 0.2]}
-            radius={0.1}
-            onClick={() => addLog('Action BUTTON: ╳ pressed', 'נלחץ מקש פעולה: ╳')}
-            id="action_buttons"
-          >
-            <Html transform position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={0.08} className="pointer-events-none">
-              <span className="font-display font-black text-[#eaeaea] select-none text-[13px] leading-none">╳</span>
-            </Html>
-          </PressableDeviceButton>
-
-          {/* Square Left */}
-          <PressableDeviceButton
-            position={[-0.18, 0, 0]}
-            args={[0.2, 0.1, 0.2]}
-            radius={0.1}
-            onClick={() => addLog('Action BUTTON: ▢ pressed', 'נלחץ מקש פעולה: ▢')}
-            id="action_buttons"
-          >
-            <Html transform position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={0.08} className="pointer-events-none">
-              <span className="font-display font-black text-[#eaeaea] select-none text-[13px] leading-none">▢</span>
-            </Html>
-          </PressableDeviceButton>
-        </group>
-      </group>
-
-      {/* 11. UNDERSIDE UTILITIES & TRIGGERS */}
-      <group position={[0, -0.16, -0.32]} rotation={[0, Math.PI, 0]}>
-        <Html transform position={[0, 0.16, 0.07]} scale={0.05} className="pointer-events-none select-none">
-          <div className="text-gray-500 font-mono text-[8px] flex items-center gap-7">
-            <span>OFF</span>
-            <span>LED LIGHT</span>
-            <span>ON</span>
-          </div>
-        </Html>
-        <PhysicalSlideSwitch
-          position={[0, 0, 0.05]}
-          isOn={lightOn}
-          onToggle={(on) => {
-            setLightOn(on);
-            addLog(`LED light system toggled: ${on ? 'ON' : 'OFF'}`, `תאורת לד אחורית שונתה: ${on ? 'מופעל' : 'כבוי'}`);
-          }}
-        />
-      </group>
-
-      {/* BACK M1 & M2 PADDLES */}
-      <group position={[-0.7, -0.15, -0.25]} rotation={[0.1, -0.2, 0]}>
-        <PressableDeviceButton
-          position={[0, 0, 0]}
-          args={[0.3, 0.14, 0.08]}
-          radius={0.03}
-          id="paddles"
-          onClick={() => addLog('Rear M1 trigger clicked', 'לחצן מאקרו אחורי M1 הופעל')}
-          color="#1b1c20"
-        >
-          <Html transform position={[0, 0, 0.05]} scale={0.07} className="pointer-events-none">
-            <span className="font-mono text-[8px] text-gray-400 font-bold">M1</span>
-          </Html>
-        </PressableDeviceButton>
-      </group>
-
-      <group position={[0.7, -0.15, -0.25]} rotation={[0.1, 0.2, 0]}>
-        <PressableDeviceButton
-          position={[0, 0, 0]}
-          args={[0.3, 0.14, 0.08]}
-          radius={0.03}
-          id="paddles"
-          onClick={() => addLog('Rear M2 trigger clicked', 'לחצן מאקרו אחורי M2 הופעל')}
-          color="#1b1c20"
-        >
-          <Html transform position={[0, 0, 0.05]} scale={0.07} className="pointer-events-none">
-            <span className="font-mono text-[8px] text-gray-400 font-bold">M2</span>
-          </Html>
-        </PressableDeviceButton>
-      </group>
-
-      {/* 12. TOP BUMPERS AND USB-C */}
-      <group position={[0, 0.69, -0.2]} rotation={[Math.PI / 2, 0, 0]}>
-        <mesh castShadow receiveShadow>
-          <boxGeometry args={[0.34, 0.12, 0.05]} />
-          <meshPhysicalMaterial color="#0c0e0f" roughness={0.9} />
-        </mesh>
-        <mesh position={[0, 0, 0.015]}>
-          <boxGeometry args={[0.26, 0.07, 0.015]} />
-          <meshPhysicalMaterial color="#cfd1d4" roughness={0.2} metalness={0.9} />
-        </mesh>
-        <mesh
-          position={[0, 0, 0.04]}
-          onPointerOver={() => setActiveHotspot('usb_port')}
-        >
-          <boxGeometry args={[0.4, 0.15, 0.05]} />
-          <meshBasicMaterial visible={false} />
-        </mesh>
-      </group>
-
-      <group position={[-0.95, 0.64, -0.15]} rotation={[0.4, 0.1, 0.15]}>
-        <PressableDeviceButton
-          position={[0, 0, 0]}
-          args={[0.45, 0.18, 0.2]}
-          radius={0.05}
-          id="usb_port"
-          onClick={() => addLog('L1 Bumper pressed', 'לחצן כתף שמאלי L1 נלחץ')}
-          color="#0d0e10"
-        >
-          <Html transform position={[0, 0, 0.11]} scale={0.07} className="pointer-events-none">
-            <span className="font-mono text-[10px] text-gray-500 font-bold">L1</span>
-          </Html>
-        </PressableDeviceButton>
-      </group>
-
-      <group position={[0.95, 0.64, -0.15]} rotation={[0.4, -0.1, -0.15]}>
-        <PressableDeviceButton
-          position={[0, 0, 0]}
-          args={[0.45, 0.18, 0.2]}
-          radius={0.05}
-          id="usb_port"
-          onClick={() => addLog('R1 Bumper pressed', 'לחצן כתף ימני R1 נלחץ')}
-          color="#0d0e10"
-        >
-          <Html transform position={[0, 0, 0.11]} scale={0.07} className="pointer-events-none">
-            <span className="font-mono text-[10px] text-gray-500 font-bold">R1</span>
-          </Html>
-        </PressableDeviceButton>
-      </group>
-
+      )}
     </group>
   );
 };

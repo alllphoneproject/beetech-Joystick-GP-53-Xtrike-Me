@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Language, DeviceState, HotspotInfo, TutorialStep } from '../types';
+import { Language, DeviceState, HotspotInfo, TutorialStep, DisplayMode } from '../types';
 
 export interface AppContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   deviceState: DeviceState;
   setDeviceState: (state: DeviceState) => void;
+  displayMode: DisplayMode;
+  setDisplayMode: (mode: DisplayMode) => void;
   activeHotspot: string | null;
   setActiveHotspot: (id: string | null) => void;
   tutorialMode: boolean;
@@ -166,6 +168,7 @@ export const tutorialStepsData: TutorialStep[] = [
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('en');
   const [deviceState, setDeviceState] = useState<DeviceState>('idle');
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('interactive');
   const [activeHotspot, setActiveHotspot] = useState<string | null>(null);
   const [tutorialMode, setTutorialMode] = useState<boolean>(true);
   const [tutorialStep, setTutorialStep] = useState<number>(0);
@@ -201,6 +204,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setLanguage,
         deviceState,
         setDeviceState,
+        displayMode,
+        setDisplayMode,
         activeHotspot,
         setActiveHotspot,
         tutorialMode,

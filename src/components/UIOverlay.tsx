@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { startVibrationHum, stopVibrationHum, playClickSound } from '../utils/audio';
 import {
@@ -22,6 +22,8 @@ export const UIOverlay: React.FC = () => {
     setLanguage,
     deviceState,
     setDeviceState,
+    displayMode,
+    setDisplayMode,
     lightOn,
     setLightOn,
     soundOn,
@@ -36,6 +38,7 @@ export const UIOverlay: React.FC = () => {
 
   const isHebrew = language === 'he';
   const consoleEndRef = useRef<HTMLDivElement>(null);
+  const [alignerExpanded, setAlignerExpanded] = useState<boolean>(false);
 
   // Scroll interactive terminal logs down when new events register
   useEffect(() => {
@@ -196,6 +199,43 @@ export const UIOverlay: React.FC = () => {
           </div>
 
           <div className="space-y-2 mt-1.5">
+            {/* 3D Fidelity Mode Switcher */}
+            <div className="flex flex-col gap-1.5 bg-[#15171a] p-2 rounded-lg border border-white/5">
+              <span className="text-[8px] font-mono text-gray-500 uppercase tracking-widest block text-left">
+                {isHebrew ? 'רמת פירוט / תצוגה' : '3D Display Mode'}
+              </span>
+              <div className="grid grid-cols-2 gap-1 bg-black/40 p-0.5 rounded-lg border border-white/5">
+                <button
+                  onClick={() => {
+                    setDisplayMode('interactive');
+                    addLog('Fidelity: Mechanical CAD model (Fully interactive)', 'מצב תצוגה: דגם שליטה מכני ואינטראקטיבי פעיל');
+                    if (soundOn) playClickSound();
+                  }}
+                  className={`py-1 px-1 rounded-[4px] text-[8.5px] font-mono transition-all font-semibold uppercase ${
+                    displayMode === 'interactive'
+                      ? 'bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/25 shadow-[0_0_8px_rgba(74,222,128,0.06)]'
+                      : 'text-gray-500 hover:text-gray-300 border border-transparent'
+                  }`}
+                >
+                  {isHebrew ? 'אינטראקטיבי' : 'CAD Model'}
+                </button>
+                <button
+                  onClick={() => {
+                    setDisplayMode('photoreal');
+                    addLog('Fidelity: Photorealistic 3D Scan (Physically scanned details)', 'מצב תצוגה: סריקה תלת-ממדית פוטו-ריאליסטית של המוצר');
+                    if (soundOn) playClickSound();
+                  }}
+                  className={`py-1 px-1 rounded-[4px] text-[8.5px] font-mono transition-all font-semibold uppercase ${
+                    displayMode === 'photoreal'
+                      ? 'bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/25 shadow-[0_0_8px_rgba(74,222,128,0.06)]'
+                      : 'text-gray-500 hover:text-gray-300 border border-transparent'
+                  }`}
+                >
+                  {isHebrew ? 'סריקת מוצר' : '3D Scan'}
+                </button>
+              </div>
+            </div>
+
             {/* Light LED Toggle state info */}
             <div className="flex justify-between items-center bg-[#15171a] p-2 rounded-lg border border-white/5 font-mono text-[10px]">
               <span className="text-gray-400 flex items-center gap-1">
@@ -217,6 +257,8 @@ export const UIOverlay: React.FC = () => {
                 {deviceState === 'turbo' ? (isHebrew ? 'פעיל 120Hz' : 'ACTIVE') : (isHebrew ? 'לא זמין' : 'DISENGAGED')}
               </span>
             </div>
+
+            {/* Status Info bar */}
           </div>
         </div>
 

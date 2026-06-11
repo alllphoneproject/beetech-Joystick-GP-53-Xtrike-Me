@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import * as THREE from 'three';
@@ -16,7 +16,7 @@ import { TutorialModal } from './components/TutorialModal';
 // Dynamic cinematic camera guide coordinating smooth translations during tours
 const CameraDirector: React.FC = () => {
   const { tutorialStep, tutorialSteps, tutorialMode } = useAppContext();
-  const { camera } = useThree();
+  const { camera, controls } = useThree() as any;
 
   const targetPosition = useMemo(() => {
     if (tutorialMode && tutorialSteps[tutorialStep]) {
@@ -29,9 +29,54 @@ const CameraDirector: React.FC = () => {
     return new THREE.Vector3(0, 0.8, 2.8);
   }, [tutorialStep, tutorialMode, tutorialSteps]);
 
+  // Track the current active lerping targets
+  const prevTarget = useRef<THREE.Vector3>(new THREE.Vector3());
+  const lerping = useRef(false);
+  const startTime = useRef(0);
+
+  useEffect(() => {
+    if (!prevTarget.current.equals(targetPosition)) {
+      prevTarget.current.copy(targetPosition);
+      lerping.current = true;
+      startTime.current = performance.now();
+    }
+  }, [targetPosition]);
+
+  // Cancel lerping instantly as soon as the user interacts with OrbitControls manually
+  useEffect(() => {
+    if (controls) {
+      const handleStart = () => {
+        lerping.current = false;
+      };
+      controls.addEventListener('start', handleStart);
+      return () => {
+        controls.removeEventListener('start', handleStart);
+      };
+    }
+  }, [controls]);
+
   useFrame(() => {
-    // lerp smoothly towards target position
-    camera.position.lerp(targetPosition, 0.065);
+    if (lerping.current) {
+      const elapsed = performance.now() - startTime.current;
+      if (elapsed > 1800) {
+        // Cut off lerp after 1.8 seconds to avoid locking user rotation
+        lerping.current = false;
+        return;
+      }
+
+      // Smoothly slide the camera
+      camera.position.lerp(targetPosition, 0.08);
+
+      // Stop once we get close
+      if (camera.position.distanceTo(targetPosition) < 0.01) {
+        camera.position.copy(targetPosition);
+        lerping.current = false;
+      }
+
+      if (controls) {
+        controls.update();
+      }
+    }
   });
 
   return null;
@@ -100,6 +145,7 @@ export default function App() {
         {/* 1. Full Screen WebGL Canvas */}
         <Canvas
           shadows
+          gl={{ localClippingEnabled: true }}
           camera={{ position: [0, 0.8, 2.8], fov: 45 }}
           className="absolute inset-0 z-10 w-full h-full"
         >

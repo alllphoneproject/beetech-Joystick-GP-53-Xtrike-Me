@@ -2,6 +2,8 @@ export type Language = 'en' | 'he';
 
 export type DeviceState = 'off' | 'idle' | 'calibrating' | 'turbo' | 'vibrating' | 'recording' | 'playing';
 
+export type DisplayMode = 'interactive' | 'photoreal';
+
 export interface HotspotInfo {
   id: string;
   nameEn: string;
